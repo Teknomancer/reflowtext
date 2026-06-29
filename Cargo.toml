@@ -18,3 +18,29 @@ lto = true
 codegen-units = 1
 opt-level = "z"
 panic = "abort"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+# Correctness / bugs
+match_bool = "warn"
+redundant_clone = "warn"
+needless_pass_by_value = "warn"
+inefficient_to_string = "warn"
+
+# IO specific - important for CLI tools
+lossy_float_literal = "warn"
+print_stderr = "warn"          # force intentional stderr use
+unused_io_amount = "warn"      # classic bug: partial reads/writes
+
+# Panics / robustness
+unwrap_used = "warn"           # prefer proper error handling
+expect_used = "warn"           # same
+indexing_slicing = "warn"      # prefer .get() with bounds check
+arithmetic_side_effects = "warn"
+
+# Idiomatic Rust
+use_self = "warn"
+manual_string_new = "warn"
+redundant_closure_for_method_calls = "warn"

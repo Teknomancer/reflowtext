@@ -6,10 +6,11 @@ use std::fs;
 use std::io::{self, IsTerminal, Read, Write};
 
 fn main() -> Result<()> {
-    let args = cli::Args::parse(std::env::args_os())?;
+    let stdin = io::stdin();
+    let args = cli::Args::parse(std::env::args_os(), stdin.is_terminal())?;
 
     if args.paths.is_empty() {
-        return reflow_stdin();
+        return reflow_stdin(&stdin);
     }
 
     for path in args.paths {
@@ -33,13 +34,10 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn reflow_stdin() -> Result<()> {
-    if io::stdin().is_terminal() {
-        bail!("usage: reflowtext <file> [file ...] or reflowtext < input.txt");
-    }
-
+fn reflow_stdin(stdin: &io::Stdin) -> Result<()> {
     let mut input = String::new();
-    io::stdin()
+    stdin
+        .lock()
         .read_to_string(&mut input)
         .context("failed to read stdin")?;
 

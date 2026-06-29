@@ -8,7 +8,7 @@ pub struct Args {
 }
 
 impl Args {
-    pub fn parse<I>(args: I) -> Result<Self>
+    pub fn parse<I>(args: I, stdin_is_terminal: bool) -> Result<Self>
     where
         I: IntoIterator<Item = OsString>,
     {
@@ -31,6 +31,11 @@ impl Args {
                 bail!("not an existing file: {}", path.display());
             }
             paths.push(path);
+        }
+
+        if paths.is_empty() && stdin_is_terminal {
+            print_help();
+            std::process::exit(1);
         }
 
         Ok(Self { paths })
@@ -56,8 +61,9 @@ mod tests {
     use std::ffi::OsString;
 
     #[test]
-    fn accepts_empty_args_for_stdin_mode() {
-        let args = Args::parse([OsString::from("reflowtext")]).unwrap();
+    fn accepts_empty_args_for_stdin_mode() -> anyhow::Result<()> {
+        let args = Args::parse([OsString::from("reflowtext")], false)?;
         assert!(args.paths.is_empty());
+        Ok(())
     }
 }

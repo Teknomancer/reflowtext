@@ -28,7 +28,7 @@ pub fn reflow_text(input: &str) -> String {
             flush_paragraph(&mut out, &mut paragraph);
             out.push(String::new());
         } else if is_reflowable(line) {
-            paragraph.push(line.trim().to_owned());
+            paragraph.push(normalize_whitespace(line));
         } else {
             flush_paragraph(&mut out, &mut paragraph);
             out.push(line.to_owned());
@@ -45,7 +45,7 @@ pub fn reflow_text(input: &str) -> String {
 }
 
 pub fn same_content(before: &str, after: &str) -> bool {
-    without_whitespace(before) == without_whitespace(after)
+    without_whitespace(before).eq(without_whitespace(after))
 }
 
 fn flush_paragraph(out: &mut Vec<String>, paragraph: &mut Vec<String>) {
@@ -84,10 +84,7 @@ fn is_list_item(trimmed: &str) -> bool {
     };
 
     if matches!(first, '-' | '*' | '+') {
-        return trimmed
-            .chars()
-            .nth(1)
-            .is_some_and(|second| second.is_whitespace());
+        return trimmed.chars().nth(1).is_some_and(char::is_whitespace);
     }
 
     let Some((number, rest)) = trimmed.split_once('.') else {
@@ -122,8 +119,12 @@ fn closes_fence(line: &str, fence: Fence) -> bool {
     trimmed.chars().take_while(|ch| *ch == fence.marker).count() >= fence.len
 }
 
-fn without_whitespace(text: &str) -> String {
-    text.chars().filter(|ch| !ch.is_whitespace()).collect()
+fn normalize_whitespace(text: &str) -> String {
+    text.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn without_whitespace(text: &str) -> impl Iterator<Item = char> + '_ {
+    text.chars().filter(|ch| !ch.is_whitespace())
 }
 
 #[cfg(test)]
@@ -139,6 +140,13 @@ mod tests {
             reflow_text(input),
             "This is a paragraph that was wrapped hard before it reached the preferred width.\n"
         );
+    }
+
+    #[test]
+    fn normalizes_internal_whitespace_runs_in_reflowed_prose() {
+        let input = "End of sentence.  Start of next.\n";
+
+        assert_eq!(reflow_text(input), "End of sentence. Start of next.\n");
     }
 
     #[test]
@@ -201,7 +209,7 @@ fn main() {
             let next_len = if current.is_empty() {
                 word.len()
             } else {
-                current.len() + 1 + word.len()
+                current.len().saturating_add(1).saturating_add(word.len())
             };
 
             if !current.is_empty() && next_len > width {
