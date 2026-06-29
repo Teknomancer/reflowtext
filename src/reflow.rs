@@ -1,5 +1,3 @@
-const WIDTH: usize = 80;
-
 pub fn reflow_text(input: &str) -> String {
     let has_final_newline = input.ends_with('\n');
     let body = input.strip_suffix('\n').unwrap_or(input);
@@ -55,38 +53,8 @@ fn flush_paragraph(out: &mut Vec<String>, paragraph: &mut Vec<String>) {
         return;
     }
 
-    let joined = paragraph.join(" ");
-    out.extend(wrap_words(&joined, WIDTH));
+    out.push(paragraph.join(" "));
     paragraph.clear();
-}
-
-fn wrap_words(text: &str, width: usize) -> Vec<String> {
-    let mut lines = Vec::new();
-    let mut current = String::new();
-
-    for word in text.split_whitespace() {
-        let next_len = if current.is_empty() {
-            word.len()
-        } else {
-            current.len() + 1 + word.len()
-        };
-
-        if !current.is_empty() && next_len > width {
-            lines.push(current);
-            current = String::new();
-        }
-
-        if !current.is_empty() {
-            current.push(' ');
-        }
-        current.push_str(word);
-    }
-
-    if !current.is_empty() {
-        lines.push(current);
-    }
-
-    lines
 }
 
 fn is_reflowable(line: &str) -> bool {
@@ -174,6 +142,24 @@ mod tests {
     }
 
     #[test]
+    fn unwraps_arbitrary_hard_wrap_widths() {
+        let words = [
+            "alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "india",
+            "juliet", "kilo", "lima", "mike", "november", "oscar", "papa", "quebec", "romeo",
+            "sierra", "tango", "uniform", "victor", "whiskey", "xray", "yankee", "zulu",
+        ];
+        let paragraph = words.join(" ");
+
+        for width in [70, 80, 90, 100] {
+            let input = hard_wrap(&paragraph, width).join("\n") + "\n";
+            let output = reflow_text(&input);
+
+            assert_eq!(output, format!("{paragraph}\n"), "width {width}");
+            assert!(same_content(&input, &output));
+        }
+    }
+
+    #[test]
     fn keeps_markdown_fenced_code_unchanged() {
         let input = "\
 Intro line that should join
@@ -205,5 +191,34 @@ fn main() {
         let input = "# Heading\n\n- First item\n- Second item\n\n> quoted\n";
 
         assert_eq!(reflow_text(input), input);
+    }
+
+    fn hard_wrap(text: &str, width: usize) -> Vec<String> {
+        let mut lines = Vec::new();
+        let mut current = String::new();
+
+        for word in text.split_whitespace() {
+            let next_len = if current.is_empty() {
+                word.len()
+            } else {
+                current.len() + 1 + word.len()
+            };
+
+            if !current.is_empty() && next_len > width {
+                lines.push(current);
+                current = String::new();
+            }
+
+            if !current.is_empty() {
+                current.push(' ');
+            }
+            current.push_str(word);
+        }
+
+        if !current.is_empty() {
+            lines.push(current);
+        }
+
+        lines
     }
 }

@@ -33,10 +33,6 @@ impl Args {
             paths.push(path);
         }
 
-        if paths.is_empty() {
-            bail!("usage: reflowtext <file> [file ...]");
-        }
-
         Ok(Self { paths })
     }
 }
@@ -45,10 +41,12 @@ fn print_help() {
     println!(
         "\
 Usage: reflowtext <file> [file ...]
+       reflowtext < input.txt
 
-Reflow hard-line wrapped prose in text or markdown files in place.
+Remove hard line wraps from prose in text or markdown files in place.
 
-Source code blocks in markdown are left unchanged."
+With stdin, writes the reflowed text to stdout. Markdown code blocks are left
+unchanged."
     );
 }
 
@@ -58,8 +56,8 @@ mod tests {
     use std::ffi::OsString;
 
     #[test]
-    fn rejects_empty_args() {
-        let err = Args::parse([OsString::from("reflowtext")]).unwrap_err();
-        assert!(err.to_string().contains("usage:"));
+    fn accepts_empty_args_for_stdin_mode() {
+        let args = Args::parse([OsString::from("reflowtext")]).unwrap();
+        assert!(args.paths.is_empty());
     }
 }

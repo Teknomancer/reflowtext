@@ -11,3 +11,10 @@ categories = ["command-line-utilities"]
 
 [dependencies]
 anyhow = "1"
+
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1
+opt-level = "z"
+panic = "abort"
