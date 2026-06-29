@@ -15,6 +15,16 @@ reflowtext < input.txt
 
 File arguments are edited in place. Stdin is written to stdout. Before writing files, it checks that only whitespace changed.
 
+### Development
+
+The repo defines Cargo aliases for the regular local workflow:
+
+```sh
+cargo build-all
+cargo test-all
+cargo lint
+```
+
 ### License
 
 Licensed under either of
