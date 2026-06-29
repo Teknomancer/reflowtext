@@ -1,0 +1,86 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: build ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macos-arm64
+            os: macos-14
+            artifact: reflowtext-macos-arm64.zip
+            binary: target/release/reflowtext
+            target: ""
+          - name: linux-x64-musl
+            os: ubuntu-24.04
+            artifact: reflowtext-linux-x64-musl.zip
+            binary: target/x86_64-unknown-linux-musl/release/reflowtext
+            target: x86_64-unknown-linux-musl
+          - name: windows-x64
+            os: windows-2022
+            artifact: reflowtext-windows-x64.zip
+            binary: target/release/reflowtext.exe
+            target: ""
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        run: rustup toolchain install stable --profile minimal
+
+      - name: Install Rust target
+        if: matrix.target != ''
+        run: rustup target add --toolchain stable ${{ matrix.target }}
+
+      - name: Build
+        if: matrix.target == ''
+        run: cargo +stable build --release --locked
+
+      - name: Build
+        if: matrix.target != ''
+        run: cargo +stable build --release --locked --target ${{ matrix.target }}
+
+      - name: Zip binary
+        if: runner.os != 'Windows'
+        run: zip -9 -j "${{ matrix.artifact }}" "${{ matrix.binary }}"
+
+      - name: Zip binary
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -CompressionLevel Optimal -Path "${{ matrix.binary }}" -DestinationPath "${{ matrix.artifact }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}
+
+  release:
+    name: publish release
+    needs: build
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "${{ github.ref_name }}"
+          dist/*.zip
+          --title "${{ github.ref_name }}"
+          --generate-notes
