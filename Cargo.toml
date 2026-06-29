@@ -2,7 +2,9 @@
 name = "reflowtext"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.96"
+# Keep this at the oldest compiler the crate needs, not the newest available:
+# GitHub Actions runner images can lag behind the latest Rust release.
+rust-version = "1.85"
 authors = ["Ramshankar <v.ramshankar@gmail.com>"]
 license = "MIT OR Apache-2.0"
 description = "A command-line utility to reflow hard-line wrapped prose in text or markdown files"

@@ -1,5 +1,6 @@
 # reflowtext
 
+[![Build](https://github.com/Teknomancer/reflowtext/workflows/Build/badge.svg)](https://github.com/Teknomancer/reflowtext/actions?query=workflow%3ABuild)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](https://opensource.org/licenses/Apache-2.0)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](https://opensource.org/licenses/MIT)
 
