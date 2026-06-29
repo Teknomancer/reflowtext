@@ -1,0 +1,13 @@
+[package]
+name = "reflowtext"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+authors = ["Ramshankar <v.ramshankar@gmail.com>"]
+license = "MIT OR Apache-2.0"
+description = "A command-line utility to reflow hard-line wrapped prose in text or markdown files"
+repository = "https://github.com/Teknomancer/reflowtext"
+categories = ["command-line-utilities"]
+
+[dependencies]
+anyhow = "1"
