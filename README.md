@@ -16,6 +16,40 @@ reflowtext < input.txt
 
 File arguments are edited in place. Stdin is written to stdout. Before writing files, it checks that only whitespace changed.
 
+### Example
+
+Given this Markdown:
+
+````markdown
+# Notes
+
+This paragraph was copied from a file
+where prose had been hard wrapped
+at a fixed editor width.
+
+- List items are left alone.
+
+```text
+code blocks
+stay exactly as written
+```
+````
+
+Running `reflowtext notes.md` rewrites only the prose paragraph:
+
+````markdown
+# Notes
+
+This paragraph was copied from a file where prose had been hard wrapped at a fixed editor width.
+
+- List items are left alone.
+
+```text
+code blocks
+stay exactly as written
+```
+````
+
 ### Development
 
 The repo defines Cargo aliases for the regular local workflow:
