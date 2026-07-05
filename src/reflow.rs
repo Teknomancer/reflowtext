@@ -96,17 +96,17 @@ struct ListItem<'a> {
 
 fn parse_list_item(line: &str) -> Option<ListItem<'_>> {
     let trimmed = line.trim_start();
-    let indent_len = line.len() - trimmed.len();
+    let indent_len = line.len().checked_sub(trimmed.len())?;
     let marker_len = list_marker_len(trimmed)?;
-    let marker_end = indent_len + marker_len;
+    let marker_end = indent_len.checked_add(marker_len)?;
     let rest = &line[marker_end..];
     let spaces_len = rest
         .char_indices()
         .take_while(|(_, ch)| ch.is_whitespace())
-        .map(|(idx, ch)| idx + ch.len_utf8())
+        .filter_map(|(idx, ch)| idx.checked_add(ch.len_utf8()))
         .last()
         .unwrap_or(0);
-    let prefix_end = marker_end + spaces_len;
+    let prefix_end = marker_end.checked_add(spaces_len)?;
 
     Some(ListItem {
         prefix: line[..prefix_end].to_owned(),
@@ -119,9 +119,7 @@ fn is_list_item(trimmed: &str) -> bool {
 }
 
 fn list_marker_len(trimmed: &str) -> Option<usize> {
-    let Some(first) = trimmed.chars().next() else {
-        return None;
-    };
+    let first = trimmed.chars().next()?;
 
     if matches!(first, '-' | '*' | '+') {
         return trimmed
@@ -131,14 +129,16 @@ fn list_marker_len(trimmed: &str) -> Option<usize> {
             .then_some(first.len_utf8());
     }
 
-    let Some((number, rest)) = trimmed.split_once('.') else {
-        return None;
-    };
+    let (number, rest) = trimmed.split_once('.')?;
 
-    (!number.is_empty()
-        && number.chars().all(|ch| ch.is_ascii_digit())
-        && rest.starts_with(char::is_whitespace))
-    .then_some(number.len() + '.'.len_utf8())
+    if number.is_empty()
+        || !number.chars().all(|ch| ch.is_ascii_digit())
+        || !rest.starts_with(char::is_whitespace)
+    {
+        return None;
+    }
+
+    number.len().checked_add('.'.len_utf8())
 }
 
 #[derive(Clone, Copy)]
