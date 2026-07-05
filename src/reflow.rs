@@ -2,7 +2,7 @@ pub fn reflow_text(input: &str) -> String {
     let has_final_newline = input.ends_with('\n');
     let body = input.strip_suffix('\n').unwrap_or(input);
     let mut out = Vec::new();
-    let mut paragraph = Vec::new();
+    let mut paragraph = Paragraph::default();
     let mut fence: Option<Fence> = None;
 
     for raw_line in body.split('\n') {
@@ -24,11 +24,15 @@ pub fn reflow_text(input: &str) -> String {
             continue;
         }
 
-        if line.trim().is_empty() {
+        if let Some(list_item) = parse_list_item(line) {
+            flush_paragraph(&mut out, &mut paragraph);
+            paragraph.prefix = list_item.prefix;
+            paragraph.lines.push(normalize_whitespace(list_item.text));
+        } else if line.trim().is_empty() {
             flush_paragraph(&mut out, &mut paragraph);
             out.push(String::new());
         } else if is_reflowable(line) {
-            paragraph.push(normalize_whitespace(line));
+            paragraph.lines.push(normalize_whitespace(line));
         } else {
             flush_paragraph(&mut out, &mut paragraph);
             out.push(line.to_owned());
@@ -48,13 +52,20 @@ pub fn same_content(before: &str, after: &str) -> bool {
     without_whitespace(before).eq(without_whitespace(after))
 }
 
-fn flush_paragraph(out: &mut Vec<String>, paragraph: &mut Vec<String>) {
-    if paragraph.is_empty() {
+#[derive(Default)]
+struct Paragraph {
+    prefix: String,
+    lines: Vec<String>,
+}
+
+fn flush_paragraph(out: &mut Vec<String>, paragraph: &mut Paragraph) {
+    if paragraph.lines.is_empty() {
         return;
     }
 
-    out.push(paragraph.join(" "));
-    paragraph.clear();
+    out.push(format!("{}{}", paragraph.prefix, paragraph.lines.join(" ")));
+    paragraph.prefix.clear();
+    paragraph.lines.clear();
 }
 
 fn is_reflowable(line: &str) -> bool {
@@ -78,22 +89,56 @@ fn is_markdown_block_line(trimmed: &str) -> bool {
         || is_list_item(trimmed)
 }
 
+struct ListItem<'a> {
+    prefix: String,
+    text: &'a str,
+}
+
+fn parse_list_item(line: &str) -> Option<ListItem<'_>> {
+    let trimmed = line.trim_start();
+    let indent_len = line.len() - trimmed.len();
+    let marker_len = list_marker_len(trimmed)?;
+    let marker_end = indent_len + marker_len;
+    let rest = &line[marker_end..];
+    let spaces_len = rest
+        .char_indices()
+        .take_while(|(_, ch)| ch.is_whitespace())
+        .map(|(idx, ch)| idx + ch.len_utf8())
+        .last()
+        .unwrap_or(0);
+    let prefix_end = marker_end + spaces_len;
+
+    Some(ListItem {
+        prefix: line[..prefix_end].to_owned(),
+        text: &line[prefix_end..],
+    })
+}
+
 fn is_list_item(trimmed: &str) -> bool {
+    list_marker_len(trimmed).is_some()
+}
+
+fn list_marker_len(trimmed: &str) -> Option<usize> {
     let Some(first) = trimmed.chars().next() else {
-        return false;
+        return None;
     };
 
     if matches!(first, '-' | '*' | '+') {
-        return trimmed.chars().nth(1).is_some_and(char::is_whitespace);
+        return trimmed
+            .chars()
+            .nth(1)
+            .is_some_and(char::is_whitespace)
+            .then_some(first.len_utf8());
     }
 
     let Some((number, rest)) = trimmed.split_once('.') else {
-        return false;
+        return None;
     };
 
-    !number.is_empty()
+    (!number.is_empty()
         && number.chars().all(|ch| ch.is_ascii_digit())
-        && rest.starts_with(char::is_whitespace)
+        && rest.starts_with(char::is_whitespace))
+    .then_some(number.len() + '.'.len_utf8())
 }
 
 #[derive(Clone, Copy)]
@@ -199,6 +244,36 @@ fn main() {
         let input = "# Heading\n\n- First item\n- Second item\n\n> quoted\n";
 
         assert_eq!(reflow_text(input), input);
+    }
+
+    #[test]
+    fn reflows_hard_wrapped_list_items() {
+        let input = "\
+- **Current state and history are separate concerns.** A live head (current state, the
+clean scan/diff baseline) plus append-only per-file history (the version record).
+
+- **Deletion detection is inference-from-absence, always.** A path present in the
+baseline but absent from a rescan is deleted.
+";
+
+        assert_eq!(
+            reflow_text(input),
+            "\
+- **Current state and history are separate concerns.** A live head (current state, the clean scan/diff baseline) plus append-only per-file history (the version record).
+
+- **Deletion detection is inference-from-absence, always.** A path present in the baseline but absent from a rescan is deleted.
+"
+        );
+    }
+
+    #[test]
+    fn preserves_list_marker_prefixes_when_reflowing() {
+        let input = "  1. First item\ncontinues here\n  * Second item\ncontinues too\n";
+
+        assert_eq!(
+            reflow_text(input),
+            "  1. First item continues here\n  * Second item continues too\n"
+        );
     }
 
     fn hard_wrap(text: &str, width: usize) -> Vec<String> {
