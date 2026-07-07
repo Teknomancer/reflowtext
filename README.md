@@ -6,8 +6,9 @@
 
 `reflowtext` is a small Rust CLI for removing hard line wraps from prose in plain text and Markdown files.
 
-It edits files in place and leaves Markdown code blocks, headings, tables, quotes, and indented code unchanged.
-List item prose is reflowed while preserving the list marker.
+It edits files in place and leaves Markdown code blocks, headings, tables, and indented code unchanged.
+List item and blockquote prose is reflowed while preserving the Markdown marker.
+GitHub admonition markers such as `> [!NOTE]` are kept on their own line.
 Source code blocks in Markdown are not subject to reflowing.
 
 ```sh

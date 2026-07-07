@@ -24,7 +24,18 @@ pub fn reflow_text(input: &str) -> String {
             continue;
         }
 
-        if let Some(list_item) = parse_list_item(line) {
+        if let Some(quote_line) = parse_quote_line(line) {
+            if is_admonition_marker(line) {
+                flush_paragraph(&mut out, &mut paragraph);
+                out.push(line.to_owned());
+                continue;
+            }
+            if !paragraph.lines.is_empty() && paragraph.prefix != quote_line.prefix {
+                flush_paragraph(&mut out, &mut paragraph);
+            }
+            paragraph.prefix = quote_line.prefix;
+            paragraph.lines.push(normalize_whitespace(quote_line.text));
+        } else if let Some(list_item) = parse_list_item(line) {
             flush_paragraph(&mut out, &mut paragraph);
             paragraph.prefix = list_item.prefix;
             paragraph.lines.push(normalize_whitespace(list_item.text));
@@ -49,7 +60,7 @@ pub fn reflow_text(input: &str) -> String {
 }
 
 pub fn same_content(before: &str, after: &str) -> bool {
-    without_whitespace(before).eq(without_whitespace(after))
+    semantic_chars(before).eq(semantic_chars(after))
 }
 
 #[derive(Default)]
@@ -80,13 +91,56 @@ fn is_reflowable(line: &str) -> bool {
 
 fn is_markdown_block_line(trimmed: &str) -> bool {
     trimmed.starts_with('#')
-        || trimmed.starts_with('>')
         || trimmed.starts_with('|')
         || trimmed.starts_with('<')
         || trimmed.starts_with("---")
         || trimmed.starts_with("***")
         || trimmed.starts_with("___")
         || is_list_item(trimmed)
+}
+
+struct QuoteLine<'a> {
+    prefix: String,
+    text: &'a str,
+}
+
+fn parse_quote_line(line: &str) -> Option<QuoteLine<'_>> {
+    let trimmed = line.trim_start();
+    let indent_len = line.len().checked_sub(trimmed.len())?;
+
+    if !trimmed.starts_with('>') {
+        return None;
+    }
+
+    let marker_end = indent_len.checked_add('>'.len_utf8())?;
+    let rest = &line[marker_end..];
+    let spaces_len = rest
+        .char_indices()
+        .take_while(|(_, ch)| ch.is_whitespace())
+        .filter_map(|(idx, ch)| idx.checked_add(ch.len_utf8()))
+        .last()
+        .unwrap_or(0);
+    let prefix_end = marker_end.checked_add(spaces_len)?;
+
+    Some(QuoteLine {
+        prefix: line[..prefix_end].to_owned(),
+        text: &line[prefix_end..],
+    })
+}
+
+fn is_admonition_marker(line: &str) -> bool {
+    let trimmed = line.trim_start();
+    let rest = trimmed.strip_prefix('>').unwrap_or(trimmed);
+    let spaces = rest.chars().take_while(|ch| *ch == ' ').count();
+
+    if spaces > 4 {
+        return false;
+    }
+
+    matches!(
+        rest[spaces..].trim_end(),
+        "[!NOTE]" | "[!TIP]" | "[!IMPORTANT]" | "[!WARNING]" | "[!CAUTION]"
+    )
 }
 
 struct ListItem<'a> {
@@ -168,8 +222,14 @@ fn normalize_whitespace(text: &str) -> String {
     text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
-fn without_whitespace(text: &str) -> impl Iterator<Item = char> + '_ {
-    text.chars().filter(|ch| !ch.is_whitespace())
+fn semantic_chars(text: &str) -> impl Iterator<Item = char> + '_ {
+    text.lines()
+        .map(|line| {
+            let line = line.strip_suffix('\r').unwrap_or(line);
+            parse_quote_line(line).map_or(line, |quote_line| quote_line.text)
+        })
+        .flat_map(str::chars)
+        .filter(|ch| !ch.is_whitespace())
 }
 
 #[cfg(test)]
@@ -241,9 +301,75 @@ fn main() {
 
     #[test]
     fn does_not_reflow_markdown_block_lines() {
-        let input = "# Heading\n\n- First item\n- Second item\n\n> quoted\n";
+        let input = "# Heading\n\n- First item\n- Second item\n\n| table |\n";
 
         assert_eq!(reflow_text(input), input);
+    }
+
+    #[test]
+    fn reflows_hard_wrapped_blockquotes() {
+        let input = "\
+# Example text
+
+> [!NOTE]
+> line is here 1
+> line is here 2
+> line is here 3
+> line is here 4
+> line is here 5
+
+## Overview
+
+Example paragraph.
+";
+
+        let output = reflow_text(input);
+
+        assert_eq!(
+            output,
+            "\
+# Example text
+
+> [!NOTE]
+> line is here 1 line is here 2 line is here 3 line is here 4 line is here 5
+
+## Overview
+
+Example paragraph.
+"
+        );
+        assert!(same_content(input, &output));
+    }
+
+    #[test]
+    fn preserves_github_admonition_markers_with_allowed_spacing() {
+        let input = "\
+> [!TIP]
+> first body line
+> second body line
+
+>    [!WARNING]
+> another body line
+> final body line
+";
+
+        assert_eq!(
+            reflow_text(input),
+            "\
+> [!TIP]
+> first body line second body line
+
+>    [!WARNING]
+> another body line final body line
+"
+        );
+    }
+
+    #[test]
+    fn reflows_blockquote_lines_that_only_look_like_over_indented_admonitions() {
+        let input = ">     [!NOTE]\n>     body line\n";
+
+        assert_eq!(reflow_text(input), ">     [!NOTE] body line\n");
     }
 
     #[test]
