@@ -1,5 +1,5 @@
-use anyhow::{Result, bail};
 use std::ffi::OsString;
+use std::io;
 use std::path::PathBuf;
 
 #[derive(Debug, Eq, PartialEq)]
@@ -8,7 +8,7 @@ pub struct Args {
 }
 
 impl Args {
-    pub fn parse<I>(args: I, stdin_is_terminal: bool) -> Result<Self>
+    pub fn parse<I>(args: I, stdin_is_terminal: bool) -> io::Result<Self>
     where
         I: IntoIterator<Item = OsString>,
     {
@@ -23,12 +23,18 @@ impl Args {
             }
 
             if arg.to_string_lossy().starts_with('-') {
-                bail!("unknown option: {}", arg.to_string_lossy());
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    format!("unknown option: {}", arg.to_string_lossy()),
+                ));
             }
 
             let path = PathBuf::from(arg);
             if !path.is_file() {
-                bail!("not an existing file: {}", path.display());
+                return Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    format!("not an existing file: {}", path.display()),
+                ));
             }
             paths.push(path);
         }
@@ -61,7 +67,7 @@ mod tests {
     use std::ffi::OsString;
 
     #[test]
-    fn accepts_empty_args_for_stdin_mode() -> anyhow::Result<()> {
+    fn accepts_empty_args_for_stdin_mode() -> std::io::Result<()> {
         let args = Args::parse([OsString::from("reflowtext")], false)?;
         assert!(args.paths.is_empty());
         Ok(())

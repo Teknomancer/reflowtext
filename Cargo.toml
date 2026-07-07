@@ -12,7 +12,6 @@ repository = "https://github.com/Teknomancer/reflowtext"
 categories = ["command-line-utilities"]
 
 [dependencies]
-anyhow = "1"
 
 [profile.release]
 strip = true
